@@ -1,0 +1,52 @@
+:root{--ink:#183b32;--muted:#71857d;--line:#dce7df;--canvas:#f4f7f3;--surface:#fff;--brand:#14634e;--brand-dark:#0e4b3b;--brand-soft:#e8f3ec;--gold:#b8874e;--shadow:0 12px 30px rgba(30,69,56,.08)}
+body{background:var(--canvas);color:var(--ink)}
+aside{width:268px;padding:30px 18px 22px;background:linear-gradient(180deg,#fdfefa 0%,#f5f9f4 100%);border-right:1px solid var(--line);box-shadow:5px 0 18px rgba(32,72,57,.025)}
+.brand{padding:10px 8px 16px;color:var(--ink)}
+.book-sticker{width:58px;height:58px;display:grid;place-items:center;flex:none}.book-sticker img{display:block;width:56px;height:56px}
+.brand small:first-of-type{color:var(--brand)}
+.nav-label{margin:27px 12px 10px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:#83958d}
+nav{display:grid;gap:3px}
+nav a{margin:0;padding:12px 13px;border:1px solid transparent;border-radius:10px;color:#61756d;font-size:13px;transition:background .18s ease,color .18s ease,transform .18s ease}
+nav a.active{background:var(--brand-soft);border-color:#d8eade;color:var(--brand-dark);box-shadow:inset 3px 0 0 var(--brand)}
+nav a:hover{background:#eef6f0;color:var(--brand-dark);transform:translateX(2px)}
+.local-badge{padding:18px 12px 0;color:#47685b;border-top-color:#dbe8dd}
+main{margin-left:268px;max-width:1800px;padding:38px 48px 56px}
+.topbar{padding-bottom:24px;margin-bottom:26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#6f8c80}
+h1{font-size:38px;color:var(--ink);letter-spacing:-1.15px}
+.sub{font-size:14px;color:#71867d;max-width:680px}
+button,.button{border-color:#d4e2d8;border-radius:9px;color:#285647;background:#fff;font-weight:600;box-shadow:0 2px 4px rgba(33,70,54,.03);transition:transform .16s ease,box-shadow .16s ease,background .16s ease}
+button:hover,.button:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(30,76,58,.1)}
+button.primary,.primary{background:linear-gradient(135deg,var(--brand),var(--brand-dark));border-color:var(--brand-dark);box-shadow:0 7px 16px rgba(20,99,78,.18)}
+.hero{border:0;border-radius:16px;background:linear-gradient(130deg,#e3f0e6 0%,#f0f5e9 100%);box-shadow:var(--shadow);padding:30px 34px}
+.hero h2{color:var(--ink)}
+.stats{gap:14px}
+.stat{border:0;border-radius:13px;background:var(--surface);box-shadow:0 3px 12px rgba(35,74,58,.055);padding:19px}
+.stat:hover{box-shadow:var(--shadow)}
+.stat-label{font-weight:600;color:#758a80}
+.stat strong{color:var(--ink)}
+.panel{border:0;border-radius:14px;background:var(--surface);box-shadow:0 4px 16px rgba(35,74,58,.06)}
+.panel-head{padding:19px 22px;border-bottom-color:#edf2ed}
+.panel-head h2{color:var(--ink)}
+.panel-head a{font-weight:700;color:var(--brand)}
+.panel-body{padding:22px}
+.toolbar{gap:10px;padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.72);box-shadow:0 3px 10px rgba(34,75,58,.04)}
+input,select,textarea{border-color:#d5e3d9;border-radius:9px;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline-color:#76aa91;border-color:#76aa91}
+.books-grid{gap:20px}
+.book-card{border:0;border-radius:14px;box-shadow:0 4px 14px rgba(32,73,55,.07);transition:transform .18s ease,box-shadow .18s ease}
+.book-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.cover{height:176px;background:#edf2e8}
+.book-info{padding:18px}
+.book-info h3{font-size:16px}
+.badge{font-weight:700;border-radius:999px;padding:5px 9px}
+th{background:#f6faf6;color:#688077;font-weight:700}
+td{border-top-color:#edf2ed}
+.report-card{border-top:3px solid #8db9a1}
+dialog{border:0;border-radius:16px;box-shadow:0 24px 70px rgba(20,55,42,.24)}
+.modal-head{background:#f5f9f5;border-bottom-color:#e7eee8}
+.settings-note{border-left:4px solid var(--brand);background:#edf6ef;color:#527465}
+#toast{background:var(--brand-dark);border-radius:10px;box-shadow:0 12px 30px rgba(15,70,53,.24)}
+@media(max-width:1100px){aside{width:224px}main{margin-left:224px;padding:30px}.stats{gap:10px}}
+@media(max-width:760px){aside{width:100%;padding:12px 15px}.brand{padding:4px 0 8px}.book-sticker{width:48px;height:48px;margin-top:0}.book-sticker img{width:48px;height:48px}nav a{padding:9px 11px}main{margin-left:0;padding:22px 16px}.topbar{padding-bottom:17px;margin-bottom:20px}h1{font-size:30px}.toolbar{padding:9px}.hero{padding:23px}.panel-head{padding:16px}.stats{gap:9px}}
+.card-actions,.table-actions{display:flex;gap:7px;align-items:center}.card-actions{margin-top:16px;padding-top:14px;border-top:1px solid #edf2ed}.card-actions button,.table-actions button{padding:7px 10px;font-size:11px}.table-actions{min-width:130px}
