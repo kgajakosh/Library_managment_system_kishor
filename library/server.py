@@ -51,6 +51,12 @@ class Handler(SimpleHTTPRequestHandler):
         if expires<=time.time(): SESSIONS.pop(token,None); return None
         SESSIONS[token]=time.time()+SESSION_TTL
         return token
+    def client_ip(self):
+        remote_ip=self.client_address[0]
+        if remote_ip in ('127.0.0.1','::1'):
+            forwarded=self.headers.get('X-Forwarded-For','').split(',',1)[0].strip()
+            if forwarded: return forwarded
+        return remote_ip
     def set_session_cookie(self,token):
         secure='; Secure' if self.server.secure_cookie else ''
         self.send_header('Set-Cookie',f'{self.server.cookie_name}={token}; Path=/; Max-Age={SESSION_TTL}; HttpOnly; SameSite=Strict{secure}')
@@ -75,7 +81,7 @@ class Handler(SimpleHTTPRequestHandler):
             username=data.get('username',''); password=data.get('password','')
             if not isinstance(username,str) or not isinstance(password,str): raise ValueError()
         except (ValueError,UnicodeError): return self.output({'error':'Invalid username or password'},400)
-        address=self.client_address[0]; now=time.time()
+        address=self.client_ip(); now=time.time()
         attempts=[t for t in LOGIN_ATTEMPTS.get(address,[]) if t>now-LOGIN_WINDOW]
         if len(attempts)>=MAX_LOGIN_ATTEMPTS:
             LOGIN_ATTEMPTS[address]=attempts
