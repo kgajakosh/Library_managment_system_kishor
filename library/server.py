@@ -1,10 +1,14 @@
 import argparse
 import csv
+import hmac
 import io
 import json
 import os
+import secrets
 import sqlite3
 import tempfile
+import time
+from http.cookies import SimpleCookie
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
@@ -12,6 +16,11 @@ from . import db
 
 STATIC=Path(__file__).parent/'static'
 MAX_BODY=32*1024*1024
+SESSION_TTL=8*60*60
+LOGIN_WINDOW=15*60
+MAX_LOGIN_ATTEMPTS=5
+SESSIONS={}
+LOGIN_ATTEMPTS={}
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self,*args,**kwargs): super().__init__(*args,directory=str(STATIC),**kwargs)
@@ -25,15 +34,81 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status); self.send_header('Content-Type',content_type)
         if filename: self.send_header('Content-Disposition',f'attachment; filename="{filename}"')
         self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
+    def redirect(self,location):
+        self.send_response(303); self.send_header('Location',location); self.send_header('Content-Length','0'); self.end_headers()
     def trusted(self):
-        expected=f'127.0.0.1:{self.server.server_port}'
-        allowed={expected,f'localhost:{self.server.server_port}'}
-        if self.headers.get('Host') not in allowed: return False
+        if self.headers.get('Host') not in self.server.allowed_hosts: return False
         origin=self.headers.get('Origin')
-        return not origin or origin in {f'http://{h}' for h in allowed}
+        return not origin or origin in self.server.allowed_origins
+    def session_token(self):
+        cookie=SimpleCookie()
+        try: cookie.load(self.headers.get('Cookie',''))
+        except Exception: return None
+        morsel=cookie.get(self.server.cookie_name)
+        token=morsel.value if morsel else None
+        expires=SESSIONS.get(token)
+        if not expires: return None
+        if expires<=time.time(): SESSIONS.pop(token,None); return None
+        SESSIONS[token]=time.time()+SESSION_TTL
+        return token
+    def set_session_cookie(self,token):
+        secure='; Secure' if self.server.secure_cookie else ''
+        self.send_header('Set-Cookie',f'{self.server.cookie_name}={token}; Path=/; Max-Age={SESSION_TTL}; HttpOnly; SameSite=Strict{secure}')
+    def clear_session_cookie(self):
+        secure='; Secure' if self.server.secure_cookie else ''
+        self.send_header('Set-Cookie',f'{self.server.cookie_name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict{secure}')
+    def login_page(self):
+        if self.session_token(): return self.redirect('/')
+        try: body=(STATIC/'login.html').read_bytes()
+        except OSError: return self.output({'error':'Login page unavailable'},500)
+        self.output(body,content_type='text/html; charset=utf-8')
+    def login(self):
+        if (not self.trusted() or self.headers.get('Origin') not in self.server.allowed_origins
+                or self.headers.get('X-Library-Request')!='1'):
+            return self.output({'error':'Invalid login request'},403)
+        try: size=int(self.headers.get('Content-Length','0'))
+        except ValueError: return self.output({'error':'Invalid request'},400)
+        if size<0 or size>4096: return self.output({'error':'Invalid request'},400)
+        try:
+            data=json.loads(self.rfile.read(size) or b'{}')
+            if not isinstance(data,dict): raise ValueError()
+            username=data.get('username',''); password=data.get('password','')
+            if not isinstance(username,str) or not isinstance(password,str): raise ValueError()
+        except (ValueError,UnicodeError): return self.output({'error':'Invalid username or password'},400)
+        address=self.client_address[0]; now=time.time()
+        attempts=[t for t in LOGIN_ATTEMPTS.get(address,[]) if t>now-LOGIN_WINDOW]
+        if len(attempts)>=MAX_LOGIN_ATTEMPTS:
+            LOGIN_ATTEMPTS[address]=attempts
+            return self.output({'error':'Too many attempts. Try again in 15 minutes.'},429)
+        valid=(hmac.compare_digest(username.encode('utf-8'),self.server.login_username.encode('utf-8'))
+               and hmac.compare_digest(password.encode('utf-8'),self.server.login_password.encode('utf-8')))
+        if not valid:
+            attempts.append(now); LOGIN_ATTEMPTS[address]=attempts
+            return self.output({'error':'Invalid username or password'},401)
+        LOGIN_ATTEMPTS.pop(address,None)
+        token=secrets.token_urlsafe(32); SESSIONS[token]=now+SESSION_TTL
+        self.send_response(200); self.send_header('Content-Type','application/json')
+        self.set_session_cookie(token); body=b'{"ok":true}'; self.send_header('Content-Length',str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+    def logout(self):
+        if (not self.trusted() or self.headers.get('Origin') not in self.server.allowed_origins
+                or self.headers.get('X-Library-Request')!='1'):
+            return self.output({'error':'Invalid logout request'},403)
+        token=self.session_token()
+        if token: SESSIONS.pop(token,None)
+        self.send_response(200); self.send_header('Content-Type','application/json')
+        self.clear_session_cookie(); body=b'{"ok":true}'; self.send_header('Content-Length',str(len(body)))
+        self.end_headers(); self.wfile.write(body)
     def do_GET(self):
         if not self.trusted(): return self.output({'error':'Invalid local origin'},403)
         path=urlparse(self.path).path
+        if path=='/login': return self.login_page()
+        if path in ('/login.js','/login.css'):
+            if self.session_token(): return self.send_error(404)
+            return super().do_GET()
+        if not self.session_token():
+            if path.startswith('/api/'): return self.output({'error':'Authentication required'},401)
+            return self.redirect('/login')
         if not path.startswith('/api/'):
             return super().do_GET()
         conn=db.connect(self.server.db_path)
@@ -58,11 +133,16 @@ class Handler(SimpleHTTPRequestHandler):
             self.output({'error':'Not found'},404)
         except (ValueError,sqlite3.Error) as exc: self.output({'error':str(exc)},400)
         finally: conn.close()
-    def do_POST(self): self.mutate()
+    def do_POST(self):
+        path=urlparse(self.path).path
+        if path=='/api/login': return self.login()
+        if path=='/api/logout': return self.logout()
+        self.mutate()
     def do_PUT(self): self.mutate()
     def do_DELETE(self): self.mutate()
     def mutate(self):
-        if not self.trusted() or self.headers.get('X-Library-Request')!='1': return self.output({'error':'Invalid local request'},403)
+        if not self.trusted() or self.headers.get('Origin') not in self.server.allowed_origins or self.headers.get('X-Library-Request')!='1': return self.output({'error':'Invalid local request'},403)
+        if not self.session_token(): return self.output({'error':'Authentication required'},401)
         conn=None
         try:
             size=int(self.headers.get('Content-Length','0'))
@@ -117,8 +197,19 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     parser=argparse.ArgumentParser(description='Local Library Management System')
     parser.add_argument('--port',type=int,default=8765); parser.add_argument('--db',default='data/library.sqlite3'); parser.add_argument('--empty',action='store_true',help='Create an empty database without samples')
-    args=parser.parse_args(); path=Path(args.db).resolve(); db.initialize(path,seed=not args.empty and not path.exists())
+    args=parser.parse_args()
+    username=os.environ.get('LIBRARY_USERNAME'); password=os.environ.get('LIBRARY_PASSWORD')
+    if not username or not password: parser.error('Set LIBRARY_USERNAME and LIBRARY_PASSWORD before starting the server')
+    path=Path(args.db).resolve(); db.initialize(path,seed=not args.empty and not path.exists())
+    default_host=f'127.0.0.1:{args.port}'
+    hosts={h.strip() for h in os.environ.get('LIBRARY_ALLOWED_HOST',f'{default_host},localhost:{args.port}').split(',') if h.strip()}
+    default_origins=f'http://127.0.0.1:{args.port},http://localhost:{args.port}'
+    origins={o.strip().rstrip('/') for o in os.environ.get('LIBRARY_ALLOWED_ORIGIN',default_origins).split(',') if o.strip()}
     server=HTTPServer(('127.0.0.1',args.port),Handler); server.db_path=path
+    server.login_username=username; server.login_password=password
+    server.allowed_hosts=hosts; server.allowed_origins=origins
+    server.secure_cookie=bool(origins) and all(origin.startswith('https://') for origin in origins)
+    server.cookie_name='__Host-library_session' if server.secure_cookie else 'library_session'
     print(f'Library is ready: http://127.0.0.1:{args.port}\nDatabase: {path}',flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: print('\nLibrary stopped.')

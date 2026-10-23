@@ -1,12 +1,23 @@
 # Little Library
 
-A complete, local Library Management System for a personal or community collection. A warm, responsive interface runs in your browser; all records and uploaded covers stay in a SQLite database on your computer. No cloud account, network connection, package installation, or build step is required.
+A Library Management System for a personal or community collection. The browser interface connects to a Python server, and records and uploaded covers are stored in its SQLite database. The server can run on your computer or on a private cloud instance.
 
 ## Run
 
 Requires **Python 3.10 or newer** and a current Chrome, Edge, Firefox, or Safari browser.
 
-From this folder:
+Set the one administrator login in your terminal environment before starting the app. Use the fixed username and the password you chose; keep the password out of Git and source files:
+
+```powershell
+$env:LIBRARY_USERNAME = "admin_123"
+$env:LIBRARY_PASSWORD = Read-Host "Enter the administrator password"
+```
+
+On macOS or Linux, export `LIBRARY_USERNAME` and `LIBRARY_PASSWORD` before starting the server. The server refuses to start if either value is missing. Keep the password in a private environment file or secret manager on EC2, outside the Git checkout.
+
+The server keeps login sessions in memory for up to eight hours. Restarting the server signs everyone out. Sign in at **http://127.0.0.1:8765/login**.
+
+Then start the server from this folder:
 
 ```sh
 python3 -m library.server
@@ -30,7 +41,7 @@ To change ports:
 python3 -m library.server --port 8766
 ```
 
-The application binds only to `127.0.0.1`. It is designed for one local library instance, not public hosting or authenticated multi-user access. Run only one server per database, particularly when restoring backups.
+The application binds only to `127.0.0.1` and supports one administrator login. For a remote deployment, put it behind an HTTPS reverse proxy, set `LIBRARY_ALLOWED_HOST` to the exact public host and `LIBRARY_ALLOWED_ORIGIN` to its HTTPS origin, and keep the app port private. The session cookie is marked Secure when every allowed origin uses HTTPS. Do not expose the app publicly without HTTPS. Run only one server per database, particularly when restoring backups.
 
 ## Windows desktop or laptop setup
 
