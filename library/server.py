@@ -196,7 +196,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     parser=argparse.ArgumentParser(description='Local Library Management System')
-    parser.add_argument('--port',type=int,default=8765); parser.add_argument('--db',default='data/library.sqlite3'); parser.add_argument('--empty',action='store_true',help='Create an empty database without samples')
+    parser.add_argument('--bind-address',default='127.0.0.1',help='Network interface address to bind (default: loopback only)'); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--db',default='data/library.sqlite3'); parser.add_argument('--empty',action='store_true',help='Create an empty database without samples')
     args=parser.parse_args()
     username=os.environ.get('LIBRARY_USERNAME'); password=os.environ.get('LIBRARY_PASSWORD')
     if not username or not password: parser.error('Set LIBRARY_USERNAME and LIBRARY_PASSWORD before starting the server')
@@ -205,12 +205,12 @@ def main():
     hosts={h.strip() for h in os.environ.get('LIBRARY_ALLOWED_HOST',f'{default_host},localhost:{args.port}').split(',') if h.strip()}
     default_origins=f'http://127.0.0.1:{args.port},http://localhost:{args.port}'
     origins={o.strip().rstrip('/') for o in os.environ.get('LIBRARY_ALLOWED_ORIGIN',default_origins).split(',') if o.strip()}
-    server=HTTPServer(('127.0.0.1',args.port),Handler); server.db_path=path
+    server=HTTPServer((args.bind_address,args.port),Handler); server.db_path=path
     server.login_username=username; server.login_password=password
     server.allowed_hosts=hosts; server.allowed_origins=origins
     server.secure_cookie=bool(origins) and all(origin.startswith('https://') for origin in origins)
     server.cookie_name='__Host-library_session' if server.secure_cookie else 'library_session'
-    print(f'Library is ready: http://127.0.0.1:{args.port}\nDatabase: {path}',flush=True)
+    print(f'Library is ready: http://{args.bind_address}:{args.port}\nDatabase: {path}',flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: print('\nLibrary stopped.')
     finally: server.server_close()
